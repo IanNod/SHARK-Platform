@@ -62,8 +62,7 @@ UnnamedTensorName = "<unnamed>"
 
 class QuantizedLayout(ABC):
     @abstractmethod
-    def dequant(self, dtype: Optional[torch.dtype] = None) -> torch.Tensor:
-        ...
+    def dequant(self, dtype: Optional[torch.dtype] = None) -> torch.Tensor: ...
 
     @classmethod
     @abstractmethod
@@ -78,8 +77,7 @@ class QuantizedLayout(ABC):
         shape: list[int],
         metadata: Optional[dict[str, MetaDataValueType]],
         planes: dict[str, torch.Tensor],
-    ) -> "QuantizedLayout":
-        ...
+    ) -> "QuantizedLayout": ...
 
     @property
     @abstractmethod
@@ -559,8 +557,7 @@ class QuantizedTensor(InferenceTensor, Generic[QuantizedLayoutT]):
         self.layout_type = layout_type
 
     @abstractmethod
-    def unpack(self) -> QuantizedLayoutT:
-        ...
+    def unpack(self) -> QuantizedLayoutT: ...
 
     def to_planar(self) -> "PlanarQuantizedTensor":
         """Converts this QuantizedTensor to a generic planar form.
@@ -580,6 +577,11 @@ class QuantizedTensor(InferenceTensor, Generic[QuantizedLayoutT]):
         If this is not desirable, subclasses should override.
         """
         return self.to_planar().add_to_archive(builder)
+
+    def split(self, split_size_or_sections: [int], dim: int) -> "[QuantizedTensor]":
+        from ..ops import split
+
+        return split(self, split_size_or_sections, dim)
 
 
 @register_inference_tensor
@@ -717,8 +719,7 @@ class ShardedTensor(InferenceTensor):
 
     @property
     @abstractmethod
-    def shard_count(self) -> int:
-        ...
+    def shard_count(self) -> int: ...
 
     @property
     @abstractmethod
@@ -941,9 +942,8 @@ class SplitPrimitiveTensor(ShardedTensorBase):
         will be split along dimension `shard_dim` into `shard_count`
         number of pieces.
         """
-        if isinstance(ts, torch.Tensor):
+        if isinstance(ts, torch.Tensor) or isinstance(ts, InferenceTensor):
             from ..ops import transfer_to_logical_device
-
             assert shard_count is not None
             ts = ts.split(ceildiv(ts.shape[shard_dim], shard_count), dim=shard_dim)
             ts = [transfer_to_logical_device(t, i) for i, t in enumerate(ts)]
