@@ -277,7 +277,15 @@ class PerplexityIree:
             )
 
             out_logits = torch.cat((out_logits, pad_logits), 1).to(self.torch_device)
-
+            if out_logits.dtype == torch.float8_e4m3fnuz:
+                out_logits_as_int8 = out_logits.view(dtype=torch.int8)
+                out_logits = torch.cat((out_logits_as_int8, pad_logits), 1).to(
+                    self.torch_device
+                )
+            else:
+                out_logits = torch.cat((out_logits, pad_logits), 1).to(
+                    self.torch_device
+                )
             return out_logits
 
         return with_iree_device_context(run_iree_module, [self.runner.config.device])
