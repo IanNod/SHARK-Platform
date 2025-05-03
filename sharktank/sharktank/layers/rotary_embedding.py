@@ -15,6 +15,8 @@ from sharktank.types import (
     ReplicatedTensor,
     ShardedTensor,
     unbox_tensor,
+    PlanarQuantizedTensor,
+    TensorScaledLayout,
 )
 
 
@@ -135,9 +137,20 @@ class RotaryEmbeddingLayer(BaseLayer):
     @staticmethod
     def rotate_half(x):
         """Rotates half the hidden dims of the input."""
-        x1 = x[..., : x.shape[-1] // 2]
-        x2 = x[..., x.shape[-1] // 2 :]
-        return torch.cat((-x2, x1), dim=-1)
+        if isinstance(x, PlanarQuantizedTensor):
+            unpacked = x.unpack()
+            if isinstance(unpacked, TensorScaledLayout):
+                shape = list(unpacked._shape)
+                x1_qs = unpacked._qs[..., : unpacked._qs.shape[-1] // 2]
+                x2_qs =  unpacked._qs[..., unpacked._qs.shape[-1] // 2 :]
+                new_qs = torch.cat((-x2_qs, x1_qs), dim=-1)
+                layout = TensorScaledLayout(shape=shape, d=unpacked._d, qs=new_qs, m=unpacked._m)
+                return PlanarQuantizedTensor(shape=shape, layout=layout)
+            return NotImplemented
+        else:
+            x1 = x[..., : x.shape[-1] // 2]
+            x2 = x[..., x.shape[-1] // 2 :]
+            return torch.cat((-x2, x1), dim=-1)
 
     def forward_unsharded(
         self,
@@ -159,8 +172,16 @@ class RotaryEmbeddingLayer(BaseLayer):
             cos = cos[None, :, None, :].repeat(xt.shape[0], 1, 1, 1)
             sin = sin[None, :, None, :].repeat(xt.shape[0], 1, 1, 1)
             xt = xt.transpose(1, 2)
-            xt_out = (xt_ * cos) + (self.rotate_half(xt_) * sin)
-            return xt_out
+            
+            #xt_out = (xt_ * cos) + (self.rotate_half(xt_) * sin)
+            
+            xt_mul = ops.elementwise(torch.mul, xt_, cos)
+            xt_rotate = ops.elementwise(torch.mul, self.rotate_half(xt_), sin)
+            print("adding")
+            xt_add = ops.elementwise(torch.add, xt_mul, xt_rotate)
+            print("done")
+
+            return xt_add
 
         # Offset the table based on starting position.
         if self.use_table:
