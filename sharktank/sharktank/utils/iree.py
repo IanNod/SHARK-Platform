@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 torch_dtype_to_hal_element_type_map = {
     torch.float8_e4m3fnuz: iree.runtime.HalElementType.FLOAT_8_E4M3_FNUZ,
+    torch.float8_e4m3fn: iree.runtime.HalElementType.FLOAT_8_E4M3_FN,
     torch.bfloat16: iree.runtime.HalElementType.BFLOAT_16,
 }
 
@@ -45,6 +46,7 @@ hal_element_type_to_torch_dtype_map = {
 
 dtype_to_dtype_reinterpret_map = {
     torch.float8_e4m3fnuz: torch.int8,
+    torch.float8_e4m3fn: torch.int8,
     torch.bfloat16: torch.int16,
 }
 """We want to map dtypes unsupported by iree.runtime.DeviceArray.
@@ -371,7 +373,7 @@ def device_array_to_host(device_array: iree.runtime.DeviceArray) -> torch.Tensor
             ),
         )
 
-    # Circumvent the lack of bfloat16, float8_e4m3fnuz, etc. in numpy.
+    # Circumvent the lack of bfloat16, float8_e4m3fnuz, float8_e4m3fn, etc. in numpy.
     # TODO: This uses private fields _device and _buffer_view in iree.runtime.DeviceArray.
     # Improve DeviceArray to provide a hatchet to allow for reinterpretation of
     # element type of the underlying buffer.

@@ -297,7 +297,7 @@ class KVCache:
             cache_partition = cache_partition.transpose(1, 2)
 
             part_block = ops.to(cache_partition, dtype=page_table.dtype)
-            if page_table.dtype == torch.float8_e4m3fnuz:
+            if page_table.dtype == torch.float8_e4m3fnuz or page_table.dtype == torch.float8_e4m3fn:
                 # Workaround for Torch not supporting torch.Tensor.index_copy_ for f8.
                 page_table_as_int8 = page_table.view(dtype=torch.int8)
                 part_block_as_int8 = part_block.view(dtype=torch.int8)
@@ -344,7 +344,7 @@ class KVCache:
             cache_partition.transpose(1, 2)
             values = ops.to(cache_partition, dtype=page_table.dtype)
 
-            if page_table.dtype == torch.float8_e4m3fnuz:
+            if page_table.dtype == torch.float8_e4m3fnuz or page_table.dtype == torch.float8_e4m3fn:
                 # Workaround for Torch not supporting torch.Tensor.index_copy_ for f8.
                 page_table_as_int8 = page_table.view(dtype=torch.int8)
                 values_int8 = values.view(dtype=torch.int8)

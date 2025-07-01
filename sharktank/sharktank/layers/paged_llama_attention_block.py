@@ -48,6 +48,7 @@ class PagedLlamaAttentionBlock(ThetaLayer):
         attn_temperature_tuning: bool = False,
         floor_scale: Optional[float] = None,
         attn_scale: Optional[float] = None,
+        attn_dtype: Optional[str] = None,
     ):
         super().__init__(theta)
         self.shard_count = cache.shard_count
@@ -117,12 +118,17 @@ class PagedLlamaAttentionBlock(ThetaLayer):
                 "kv_cache.quantizer"
             )
         if "attn_scale" in theta.keys:
+            fp8_scale = 2.0
+            fp8_dtype = torch.float8_e4m3fnuz
+            if attn_dtype == torch.float8_e4m3fn:
+                fp8_scale = 1.0
+                fp8_dtype = torch.float8_e4m3fn
             self.attention_scale = theta("attn_scale").as_torch()
             self.probs_quantizer = StaticScaledQuantizer(
                 name="attn_scale.quantizer",
-                scale=1.0 / (self.attention_scale * 2.0),
-                reciprocal_scale=self.attention_scale * 2.0,
-                dtype=torch.float8_e4m3fnuz,
+                scale=1.0 / (self.attention_scale * fp8_scale),
+                reciprocal_scale=self.attention_scale * fp8_scale,
+                dtype=fp8_dtype,
             )
 
         if theta.optional_tensor("attn_output_norm") is None:

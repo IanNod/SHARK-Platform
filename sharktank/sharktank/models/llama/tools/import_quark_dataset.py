@@ -99,6 +99,7 @@ def apply_per_layer_quant(
     updated_tensors: dict[str, InferenceTensor],
     n_head: int,
     split_sizes: list[int],
+    ocp_fp8: bool = False,
 ):
     """Take the quantization parameters and hf weights from the imported Theta
     and create InferenceTensors out of them, converting their names to gguf format
@@ -130,7 +131,12 @@ def apply_per_layer_quant(
         return
 
     layer_parent = ".".join(layer_name.split(".")[:-1])
-
+        
+    fp8_scale = 2.0
+    fp8_dtype = torch.float8_e4m3fnuz
+    if ocp_fp8:
+        fp8_scale = 1.0
+        fp8_dtype = torch.float8_e4m3fn
     def quantize_weight(
         weight_name: str,
         weight: torch.Tensor,
@@ -138,14 +144,14 @@ def apply_per_layer_quant(
         weight_zp: Optional[torch.Tensor],
     ):
         # Our scale is the reciprocal of the quark scale
-        # We multiply scale by two to account for diff between fnuz and fn
+        # We multiply scale by two for non ocp fp8 to account for diff between fnuz and fn
         weight_quantizer = StaticScaledQuantizer(
-            scale=1.0 / (weight_scale * 2.0),
-            reciprocal_scale=(weight_scale * 2.0),
+            scale=1.0 / (weight_scale * fp8_scale),
+            reciprocal_scale=(weight_scale * fp8_scale),
             offset=None
             if (weight_zp is None or torch.count_nonzero(weight_zp) == 0)
             else weight_zp,
-            dtype=torch.float8_e4m3fnuz,
+            dtype=fp8_dtype,
         )
         weight_quant = weight_quantizer.quantize(weight, name=weight_name)
         updated_tensors[weight_quant.name] = weight_quant
@@ -185,17 +191,17 @@ def apply_per_layer_quant(
         for name in names:
             updated_tensors[name] = StaticScaledQuantizer(
                 name=name,
-                scale=1.0 / (output_quant_scale * 2.0),
-                reciprocal_scale=output_quant_scale * 2.0,
-                dtype=torch.float8_e4m3fnuz,
+                scale=1.0 / (output_quant_scale * fp8_scale),
+                reciprocal_scale=output_quant_scale * fp8_scale,
+                dtype=fp8_dtype,
             )
         names = [f"{i}.q_input" for i in [q_name, k_name, v_name]]
         for name in names:
             updated_tensors[name] = StaticScaledQuantizer(
                 name=name,
-                scale=1.0 / (input_quant_scale * 2.0),
-                reciprocal_scale=input_quant_scale * 2.0,
-                dtype=torch.float8_e4m3fnuz,
+                scale=1.0 / (input_quant_scale * fp8_scale),
+                reciprocal_scale=input_quant_scale * fp8_scle,
+                dtype=fp8_dtype,
             )
         # Remove the updated tensors from the original tree.
         root_theta.pop(layer_parent + ".q_proj")
@@ -212,20 +218,20 @@ def apply_per_layer_quant(
             weight_quant_zero_point,
         )
         # we explicitly provide the reciprocal scale because converting from float16 to float8 after doing 1/scale results in significant numerical differences
-        # scales are multipled by two to account for the difference between fnuz and fn
+        # scales are multipled by two for non ocp fp8 to account for the difference between fnuz and fn
         if input_quant_scale is not None:
             updated_tensors[new_layer_name + ".q_input"] = StaticScaledQuantizer(
                 name=new_layer_name + ".q_input",
-                scale=1.0 / (input_quant_scale * 2.0),
-                reciprocal_scale=input_quant_scale * 2.0,
-                dtype=torch.float8_e4m3fnuz,
+                scale=1.0 / (input_quant_scale * fp8_scale),
+                reciprocal_scale=input_quant_scale * fp8_scale,
+                dtype=fp8_dtype,
             )
         if output_quant_scale is not None:
             updated_tensors[new_layer_name + ".q_output"] = StaticScaledQuantizer(
                 name=new_layer_name + ".q_output",
-                scale=1.0 / (output_quant_scale * 2.0),
-                reciprocal_scale=output_quant_scale * 2.0,
-                dtype=torch.float8_e4m3fnuz,
+                scale=1.0 / (output_quant_scale * fp8_scale),
+                reciprocal_scale=output_quant_scale * fp8_scale,
+                dtype=fp8_dtype,
             )
 
         # Remove the updated tensor from the original tree.
@@ -255,7 +261,10 @@ def convert_hf_hparams_to_gguf(hf_hparams: dict[str, any]) -> dict[str, any]:
 
 
 def update_norm_layer(
-    quant_theta: Theta, layer_name: str, updated_tensors: dict[str, InferenceTensor]
+    quant_theta: Theta,
+    layer_name: str,
+    updated_tensors: dict[str, InferenceTensor],
+    ocp_fp8: bool = False,
 ):
     """Convert layernames for non quantized tensors and add them to the updated_tensors dict"""
     for sub in ["input_layernorm", "post_attention_layernorm"]:
@@ -265,6 +274,11 @@ def update_norm_layer(
 
     if "self_attn" in quant_theta(layer_name).keys:
         layer_idx = layer_name.split(".")[-1]
+        fp8_scale = 2.0
+        fp8_dtype = torch.float8_e4m3fnuz
+        if ocp_fp8:
+            fp8_scale = 1.0
+            fp8_dtype = torch.float8_e4m3fn
         if "kv_cache_scale" in quant_theta(layer_name, "self_attn").keys:
             kv_cache_scale = (
                 quant_theta(layer_name, "self_attn")
@@ -275,9 +289,9 @@ def update_norm_layer(
             new_name = f"blk.{layer_idx}.kv_cache"
             updated_tensors[new_name] = StaticScaledQuantizer(
                 name=new_name + ".quantizer",
-                scale=1.0 / (kv_cache_scale * 2.0),
-                reciprocal_scale=kv_cache_scale * 2.0,
-                dtype=torch.float8_e4m3fnuz,
+                scale=1.0 / (kv_cache_scale * fp8_scale),
+                reciprocal_scale=kv_cache_scale * fp8_scale,
+                dtype=fp8_dtype,
             )
 
         if "prob_output_scale" in quant_theta(layer_name, "self_attn").keys:
@@ -327,6 +341,13 @@ def main(argv):
         help="Base model to use for split sizes to decompose the qkv tensor. Default is 7b, 70b is also supported.",
         choices=["7b", "70b", "405b"],
     )
+    parser.add_argument(
+        "--ocp-fp8",
+        type=bool,
+        default=False,
+        help="Determines if fp8 datatype will output ocp format (float8_e4m3fn) or not (float8_e4m3fnuz).",
+    )
+
     args = cli.parse(parser, args=argv)
 
     config_json_path: Path = args.config_json
@@ -395,6 +416,7 @@ def main(argv):
                 updated_tensors,
                 n_head=head_count[0],
                 split_sizes=split_sizes,
+                ocp_fp8=args.ocp_fp8,
             )
 
     # Update the non quantized weights (norm layers)
@@ -403,6 +425,7 @@ def main(argv):
             quant_theta,
             layer_idx,
             updated_tensors,
+            ocp_fp8=args.ocp_fp8,
         )
 
     # The stragglers

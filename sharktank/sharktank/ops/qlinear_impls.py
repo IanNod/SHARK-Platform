@@ -50,7 +50,9 @@ def qlinear_tensor_scaled(
     if x_layout.qs.dtype.is_floating_point or weight_layout.qs.dtype.is_floating_point:
         if (
             x_layout.qs.dtype != torch.float8_e4m3fnuz
+            or x_layout.qs.dtype != torch.float8_e4m3fn
             or weight_layout.qs.dtype != torch.float8_e4m3fnuz
+            or weight_layout.qs.dtype != torch.float8_e4m3fn
         ):
             return NotImplemented
 

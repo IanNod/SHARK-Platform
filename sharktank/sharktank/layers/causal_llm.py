@@ -101,7 +101,7 @@ class BaseCausalLMModel(ThetaLayer):
     def decode_attention_mask(self, boolean_input_mask: torch.Tensor):
         dtype = (
             torch.float32
-            if self.attention_dtype == torch.float8_e4m3fnuz
+            if self.attention_dtype == torch.float8_e4m3fnuz or self.attention_dtype == torch.float8_e4m3fn
             else self.attention_dtype
         )
         numeric_mask = torch.where(
@@ -134,7 +134,7 @@ class BaseCausalLMModel(ThetaLayer):
         # Combine the causal context mask and input mask.
         dtype = (
             torch.float32
-            if self.attention_dtype == torch.float8_e4m3fnuz
+            if self.attention_dtype == torch.float8_e4m3fnuz or self.attention_dtype == torch.float8_e4m3fn
             else self.attention_dtype
         )
         _, batch_seq_len = input_mask.shape

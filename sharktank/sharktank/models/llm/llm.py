@@ -362,6 +362,7 @@ class AttentionFFNBlock(ThetaLayer):
                 attn_temperature_tuning=config.attn_temperature_tuning,
                 floor_scale=config.floor_scale,
                 attn_scale=config.attn_scale,
+                attn_dtype=config.attention_dtype,
             ),
         )
 
