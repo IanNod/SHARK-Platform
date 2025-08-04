@@ -42,7 +42,6 @@ from sharktank.utils.iree import (
     prepare_iree_module_function_args,
     call_torch_module_function,
     flatten_for_iree_signature,
-    iree_to_torch,
 )
 from sharktank.utils.logging import format_tensor_statistics
 from sharktank.utils import chdir
@@ -156,14 +155,12 @@ class FluxTest(TempDirTestBase):
             )
 
             logger.info("Invoking IREE function...")
-            iree_result = iree_to_torch(
-                *run_iree_module_function(
-                    module=iree_module,
-                    vm_context=iree_vm_context,
-                    args=iree_args,
-                    device=iree_devices[0],
-                    function_name=f"forward_bs{batch_size}",
-                )
+            iree_result = run_iree_module_function(
+                module=iree_module,
+                vm_context=iree_vm_context,
+                args=iree_args,
+                device=iree_devices[0],
+                function_name=f"forward_bs{batch_size}",
             )
             actual_outputs = [
                 ops.to(iree_result[i], dtype=expected_outputs[i].dtype)

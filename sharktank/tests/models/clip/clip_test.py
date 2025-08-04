@@ -33,7 +33,6 @@ from sharktank.utils.iree import (
     prepare_iree_module_function_args,
     call_torch_module_function,
     flatten_for_iree_signature,
-    iree_to_torch,
 )
 from sharktank.types import (
     DefaultPrimitiveTensor,
@@ -230,15 +229,13 @@ class ClipTextIreeTest(TempDirTestBase):
                 args=flatten_for_iree_signature(input_args), devices=iree_devices
             )
             logger.info("Invoking IREE function...")
-            iree_result = iree_to_torch(
-                *run_iree_module_function(
-                    module=iree_module,
-                    vm_context=iree_vm_context,
-                    args=iree_args,
-                    device=iree_devices[0],
-                    function_name=f"forward_bs{batch_size}",
-                    trace_path_prefix=f"{target_model_path_prefix}_iree_",
-                )
+            iree_result = run_iree_module_function(
+                module=iree_module,
+                vm_context=iree_vm_context,
+                args=iree_args,
+                device=iree_devices[0],
+                function_name=f"forward_bs{batch_size}",
+                trace_path_prefix=f"{target_model_path_prefix}_iree_",
             )
             actual_outputs = [
                 ops.to(iree_result[i], dtype=expected_outputs[i].dtype)

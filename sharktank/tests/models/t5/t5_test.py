@@ -65,11 +65,11 @@ from sharktank.utils.iree import (
     prepare_iree_module_function_args,
     call_torch_module_function,
     flatten_for_iree_signature,
-    iree_to_torch,
 )
 from sharktank.transforms.dataset import set_float_dtype
 from sharktank import ops
 import iree.compiler
+import numpy as np
 
 with_t5_data = pytest.mark.skipif("not config.getoption('with_t5_data')")
 
@@ -244,8 +244,8 @@ class T5EncoderEagerTest(TestCase):
         _, input_kwargs = target_model.sample_inputs(batch_size=2)
 
         def assert_close(actual: torch.Tensor, expected: torch.Tensor):
-            assert_tensor_close(
-                actual.to(dtype=expected.dtype), expected, atol=atol, rtol=rtol
+            np.testing.assert_allclose(
+                actual.to(dtype=expected.dtype), expected.detach().numpy(), atol=atol, rtol=rtol
             )
 
         self.compare_torch_eager_vs_hugging_face(
@@ -403,17 +403,15 @@ class T5EncoderIreeTest(TempDirTestBase):
                 args=flatten_for_iree_signature(input_kwargs), devices=iree_devices
             )
             logger.info("Invoking IREE function...")
-            iree_result = iree_to_torch(
-                *run_iree_module_function(
+            iree_result = run_iree_module_function(
                     module=iree_module,
                     vm_context=iree_vm_context,
                     args=iree_args,
                     device=iree_devices[0],
                     function_name=f"forward_bs{batch_size}",
                     trace_path_prefix=f"{self.path_prefix}iree_",
-                )
             )
-            return [t.clone() for t in iree_result]
+            return iree_result
 
         iree_result = with_iree_device_context(run_iree_module, iree_devices)
 
@@ -510,7 +508,7 @@ class T5EncoderIreeTest(TempDirTestBase):
 
         def assert_close(actual: torch.Tensor, expected: torch.Tensor):
             torch.testing.assert_close(
-                actual.to(dtype=expected.dtype), expected, atol=atol, rtol=rtol
+                actual.to_host().astype(expected.dtype), expected, atol=atol, rtol=rtol
             )
 
         self.compare_iree_vs_eager(

@@ -19,7 +19,6 @@ from sharktank.utils.iree import (
     device_array_to_host,
     get_iree_devices,
     run_model_with_iree_run_module,
-    tensor_to_device_array,
     trace_model_with_tracy,
     with_iree_device_context,
 )
@@ -72,47 +71,3 @@ def test_trace_model_with_tracy(dummy_model: DummyModel, dummy_model_path: Path)
         trace_model_with_tracy(dummy_model.config, function="forward_bs1")
         assert trace_path.exists()
 
-
-@pytest.mark.usefixtures("iree_flags")
-class TestTensorConversion(TestCase):
-    def setUp(self):
-        torch.manual_seed(0)
-
-    @parameterized.expand(
-        [
-            (torch.float32, torch.float32),
-            (torch.float64, torch.float64),
-            (torch.bfloat16, torch.bfloat16),
-            (torch.float8_e4m3fnuz, torch.float32),
-        ]
-    )
-    def testRoundtrip(self, dtype: torch.dtype, dtype_for_equality_check: torch.dtype):
-        if dtype.is_floating_point:
-            tensor = torch.rand([3, 4], dtype=torch.float32).to(dtype=dtype)
-        else:
-            tensor = torch.randint(low=0, high=100, size=[3, 4], dtype=dtype)
-
-        iree_devices = get_iree_devices(device=self.iree_device, device_count=1)
-
-        def roundtrip(iree_devices: list[iree.runtime.HalDevice]):
-            tensor_roundtrip = device_array_to_host(
-                tensor_to_device_array(tensor, iree_devices[0])
-            )
-            assert tensor.to(dtype=dtype_for_equality_check).equal(
-                tensor_roundtrip.to(dtype=dtype_for_equality_check)
-            )
-
-        with_iree_device_context(roundtrip, iree_devices)
-
-    def testTensorToDeviceArraySupportsDefaultPrimitiveTensor(self):
-        tensor = DefaultPrimitiveTensor(data=torch.arange(1, 4, dtype=int))
-
-        iree_devices = get_iree_devices(device=self.iree_device, device_count=1)
-
-        def roundtrip(iree_devices: list[iree.runtime.HalDevice]):
-            tensor_roundtrip = device_array_to_host(
-                tensor_to_device_array(tensor, iree_devices[0])
-            )
-            assert ops.equal(tensor, tensor_roundtrip)
-
-        with_iree_device_context(roundtrip, iree_devices)

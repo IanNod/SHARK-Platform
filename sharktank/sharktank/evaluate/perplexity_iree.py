@@ -277,16 +277,16 @@ class PerplexityIree:
             vm_context=self.vm_context,
             device=devices[0],
         )
-        prefill_shards = iree_to_torch(*prefill_iree_result)
+        prefill_shards = prefill_iree_result
         if self.tensor_parallelism_size > 1:
             prefill_logits = ops.unshard(UnreducedTensor(ts=prefill_shards))
         else:  # Replicated or torch.Tensor
             prefill_logits = prefill_shards[0]
-        prefill_logits = prefill_logits.clone().detach()
+        prefill_logits = prefill_logits.to_host()
 
         tokens = torch.as_tensor(
             self.generator.model.extract_tokens_from_logits(
-                prefill_logits, self.batch.seq_lens
+                torch.from_numpy(prefill_logits), self.batch.seq_lens
             )
         ).unsqueeze(1)
         self.batch.add_result_token(tokens)
@@ -330,7 +330,7 @@ class PerplexityIree:
             device=devices[0],
         )
 
-        decode_shards = iree_to_torch(*decode_iree_result)
+        decode_shards = decode_iree_result
         if self.tensor_parallelism_size > 1:
             decode_logits = ops.unshard(UnreducedTensor(ts=decode_shards))
         else:  # Replicated or torch.Tensor
@@ -366,7 +366,7 @@ class PerplexityIree:
                     token_batch = self.token_ids[:, : i + 1]
 
                     start = time.time_ns()
-                    prefill_logits = self.prefill_vmfb(token_batch, i, devices).clone()
+                    prefill_logits = self.prefill_vmfb(token_batch, i, devices)
                     self.prefill_time = time.time_ns() - start
 
                     last_logits_indices = torch.minimum(
@@ -375,9 +375,9 @@ class PerplexityIree:
                     last_logits_indices = torch.maximum(
                         last_logits_indices, torch.tensor(0)
                     )
-                    last_real_prefill_logits = prefill_logits[
+                    last_real_prefill_logits = np.expand_dims(prefill_logits[
                         self.batch_indices, last_logits_indices, :
-                    ].unsqueeze(1)
+                    ], axis=1)
                     out_logits.append(last_real_prefill_logits)
                 else:
                     token_batch = self.token_ids[:, i : i + 1]
@@ -386,23 +386,23 @@ class PerplexityIree:
                     self.decode_time.append(time.time_ns() - start)
                     out_logits.append(decode_logits)
 
-            out_logits = ops.cat(out_logits, dim=1)
+            out_logits = np.concatenate(out_logits, axis=1)
 
             pad_logits_shape = self.token_ids.shape[1] - out_logits.shape[1]
 
-            pad_logits = torch.zeros(
-                out_logits.shape[0], pad_logits_shape, out_logits.shape[2]
+            pad_logits = np.zeros(
+                (out_logits.shape[0], pad_logits_shape, out_logits.shape[2])
             )
 
             self.cache_state = None  # Remove saved reference to iree.runtime.DeviceArray before leaving function
-            return ops.cat(
+            return np.concatenate(
                 (
                     pad_logits[:, : self.prefill_length],
                     out_logits,
                     pad_logits[:, self.prefill_length :],
                 ),
-                dim=1,
-            ).to(self.torch_device)
+                axis=1,
+            )
 
         return with_iree_device_context(run_iree_module, self.devices)
 
