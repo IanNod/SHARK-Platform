@@ -93,11 +93,11 @@ def run_test_toy_size_sharded_resnet_block_with_iree(artifacts_dir: Path):
             args=input_args, devices=iree_devices
         )
         iree_results = run_iree_module_function(
-                module=iree_module,
-                vm_context=iree_vm_context,
-                args=iree_args,
-                device=iree_devices[0],
-                function_name="forward",
+            module=iree_module,
+            vm_context=iree_vm_context,
+            args=iree_args,
+            device=iree_devices[0],
+            function_name="forward",
         )
         return [
             ops.to(iree_results[i], dtype=expected_results[i].dtype).clone()

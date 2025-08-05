@@ -375,9 +375,10 @@ class PerplexityIree:
                     last_logits_indices = torch.maximum(
                         last_logits_indices, torch.tensor(0)
                     )
-                    last_real_prefill_logits = np.expand_dims(prefill_logits[
-                        self.batch_indices, last_logits_indices, :
-                    ], axis=1)
+                    last_real_prefill_logits = np.expand_dims(
+                        prefill_logits[self.batch_indices, last_logits_indices, :],
+                        axis=1,
+                    )
                     out_logits.append(last_real_prefill_logits)
                 else:
                     token_batch = self.token_ids[:, i : i + 1]

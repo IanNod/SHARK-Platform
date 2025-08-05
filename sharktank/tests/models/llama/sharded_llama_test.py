@@ -362,22 +362,26 @@ class ShardedLlamaTest(unittest.TestCase):
             )
             for i, arg in enumerate(prefill_iree_args):
                 np.save(f"{path_prefix}prefill_arg{i}.npy", arg.to_host())
-            prefill_iree_result = [torch.from_numpy(t.to_host()) for t in run_iree_module_function(
-                args=prefill_iree_args,
-                function_name="prefill",
-                module=iree_module,
-                vm_context=vm_context,
-                device=iree_devices[0],
-                trace_path_prefix=path_prefix if dump_enabled else None,
-            )]
-            prefill_iree_result = UnreducedTensor(
-                ts=[t for t in prefill_iree_result]
-            )
+            prefill_iree_result = [
+                torch.from_numpy(t.to_host())
+                for t in run_iree_module_function(
+                    args=prefill_iree_args,
+                    function_name="prefill",
+                    module=iree_module,
+                    vm_context=vm_context,
+                    device=iree_devices[0],
+                    trace_path_prefix=path_prefix if dump_enabled else None,
+                )
+            ]
+            prefill_iree_result = UnreducedTensor(ts=[t for t in prefill_iree_result])
             prefill_iree_cache_state_shards = prefill_iree_args[
                 -self.config.tensor_parallelism_size - 1 :
             ]
             prefill_iree_cache_state = SplitPrimitiveTensor(
-                ts=[torch.from_numpy(t.to_host()) for t in prefill_iree_cache_state_shards],
+                ts=[
+                    torch.from_numpy(t.to_host())
+                    for t in prefill_iree_cache_state_shards
+                ],
                 shard_dim=sharded_prefill_kwargs["cache_state"][0].shard_dim,
             )
 
@@ -385,23 +389,27 @@ class ShardedLlamaTest(unittest.TestCase):
             decode_iree_args = prepare_iree_module_function_args(
                 args=deepcopy(sharded_decode_kwargs).values(), devices=iree_devices
             )
-            decode_iree_result = [torch.from_numpy(t.to_host()) for t in run_iree_module_function(
-                args=decode_iree_args,
-                function_name="decode",
-                module=iree_module,
-                vm_context=vm_context,
-                device=iree_devices[0],
-                trace_path_prefix=path_prefix if dump_enabled else None,
-            )]
+            decode_iree_result = [
+                torch.from_numpy(t.to_host())
+                for t in run_iree_module_function(
+                    args=decode_iree_args,
+                    function_name="decode",
+                    module=iree_module,
+                    vm_context=vm_context,
+                    device=iree_devices[0],
+                    trace_path_prefix=path_prefix if dump_enabled else None,
+                )
+            ]
 
-            decode_iree_result = UnreducedTensor(
-                ts=[t for t in decode_iree_result]
-            )
+            decode_iree_result = UnreducedTensor(ts=[t for t in decode_iree_result])
             decode_iree_cache_state_shards = decode_iree_args[
                 -self.config.tensor_parallelism_size - 1 :
             ]
             decode_iree_cache_state = SplitPrimitiveTensor(
-                ts=[torch.from_numpy(t.to_host()) for t in decode_iree_cache_state_shards],
+                ts=[
+                    torch.from_numpy(t.to_host())
+                    for t in decode_iree_cache_state_shards
+                ],
                 shard_dim=sharded_decode_kwargs["cache_state"][0].shard_dim,
             )
 

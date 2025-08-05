@@ -245,7 +245,10 @@ class T5EncoderEagerTest(TestCase):
 
         def assert_close(actual: torch.Tensor, expected: torch.Tensor):
             np.testing.assert_allclose(
-                actual.to(dtype=expected.dtype), expected.detach().numpy(), atol=atol, rtol=rtol
+                actual.to(dtype=expected.dtype),
+                expected.detach().numpy(),
+                atol=atol,
+                rtol=rtol,
             )
 
         self.compare_torch_eager_vs_hugging_face(
@@ -404,12 +407,12 @@ class T5EncoderIreeTest(TempDirTestBase):
             )
             logger.info("Invoking IREE function...")
             iree_result = run_iree_module_function(
-                    module=iree_module,
-                    vm_context=iree_vm_context,
-                    args=iree_args,
-                    device=iree_devices[0],
-                    function_name=f"forward_bs{batch_size}",
-                    trace_path_prefix=f"{self.path_prefix}iree_",
+                module=iree_module,
+                vm_context=iree_vm_context,
+                args=iree_args,
+                device=iree_devices[0],
+                function_name=f"forward_bs{batch_size}",
+                trace_path_prefix=f"{self.path_prefix}iree_",
             )
             return iree_result
 

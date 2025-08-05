@@ -70,4 +70,3 @@ def test_trace_model_with_tracy(dummy_model: DummyModel, dummy_model_path: Path)
         assert not trace_path.exists()
         trace_model_with_tracy(dummy_model.config, function="forward_bs1")
         assert trace_path.exists()
-

@@ -44,6 +44,7 @@ torch_to_numpy_reinterpret_map = {
 if TYPE_CHECKING:
     from ..layers import ModelConfig
 
+
 def oneshot_iree_run(
     module: torch.nn.Module,
     args: tuple[Any, ...] = tuple(),
@@ -391,6 +392,7 @@ def device_array_to_host(device_array: iree.runtime.DeviceArray) -> torch.Tensor
             element_type=int(element_type),
         )
 
+
 def run_iree_module_function(
     module: iree.runtime.VmModule,
     vm_context: iree.runtime.VmContext,
@@ -417,7 +419,8 @@ def run_iree_module_function(
     if trace_path_prefix is not None:
         for i, arg in enumerate(args):
             np.save(
-                f"{trace_path_prefix}{function_name}_arg{i}.npy", arg.to_host(),
+                f"{trace_path_prefix}{function_name}_arg{i}.npy",
+                arg.to_host(),
             )
     results = invoker(*args)
     if isinstance(results, iree.runtime.DeviceArray):
@@ -426,11 +429,13 @@ def run_iree_module_function(
     if trace_path_prefix is not None:
         for i, arg in enumerate(args):
             np.save(
-                f"{trace_path_prefix}{function_name}_arg{i}_post_call.npy", arg.to_host(),
+                f"{trace_path_prefix}{function_name}_arg{i}_post_call.npy",
+                arg.to_host(),
             )
         for i, arg in enumerate(results):
             np.save(
-                f"{trace_path_prefix}{function_name}_result{i}.npy", device_array_to_host(arg),
+                f"{trace_path_prefix}{function_name}_result{i}.npy",
+                device_array_to_host(arg),
             )
     return results
 
@@ -459,7 +464,17 @@ def prepare_iree_module_function_args(
             reinterpret_dtype = arg.dtype
             if arg.dtype in torch_to_numpy_reinterpret_map:
                 reinterpret_dtype = torch_to_numpy_reinterpret_map[arg.dtype]
-            res.append(iree.runtime.asdevicearray(devices[0], unbox_tensor(arg).to(reinterpret_dtype).to("cpu").detach().numpy().astype(dtype_to_serialized_name(arg.dtype))))
+            res.append(
+                iree.runtime.asdevicearray(
+                    devices[0],
+                    unbox_tensor(arg)
+                    .to(reinterpret_dtype)
+                    .to("cpu")
+                    .detach()
+                    .numpy()
+                    .astype(dtype_to_serialized_name(arg.dtype)),
+                )
+            )
         elif isinstance(arg, iree.runtime.DeviceArray):
             res.append(arg)
         else:
