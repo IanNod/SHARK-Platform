@@ -460,7 +460,10 @@ def prepare_iree_module_function_args(
                 ]
             )
         elif isinstance(arg, (DefaultPrimitiveTensor, torch.Tensor)):
-            # Torch tensor .detach().numpy() methods do not support non-standard ml_dtype dtypes. We are reinterpeting to a supported dtype and then casting to the appropriate numpy/ml_dtype here
+            """Torch tensor .detach().numpy() methods do not support non-standard
+            ml_dtype dtypes. We are reinterpeting to a supported dtype and then 
+            casting to the appropriate numpy/ml_dtype here
+            """
             reinterpret_dtype = arg.dtype
             if arg.dtype in torch_to_numpy_reinterpret_map:
                 reinterpret_dtype = torch_to_numpy_reinterpret_map[arg.dtype]
