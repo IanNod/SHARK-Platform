@@ -37,6 +37,7 @@ import iree.runtime
 
 torch_to_numpy_reinterpret_map = {
     torch.float8_e4m3fnuz: torch.int8,
+    torch.float8_e4m3fn: torch.int8,
     torch.bfloat16: torch.int16,
 }
 
